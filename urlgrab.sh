@@ -26,7 +26,7 @@ echo "Downloading to $(pwd)"
 while [ $START -lt $(($END+1)) ]
 do
 	# Run function while process count is below threshold
-	if [ $(/usr/bin/pgrep curl 2>/dev/null | wc -l) -lt $JOBCOUNT ]
+	if [ $(pgrep curl 2>/dev/null | wc -l) -lt $JOBCOUNT ]
 	then
 		run_curl $START &
 		START=$(($START+1))
