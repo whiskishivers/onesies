@@ -13,7 +13,6 @@ TSHARK = '/usr/bin/tshark'
 
 
 parser = argparse.ArgumentParser(
-    prog ="OSPF LSA summarizer",
     description = "Summarize links found in OSPF packets from a PCAP file."
 )
 parser.add_argument('filename', help = "The path to the PCAP file.")
