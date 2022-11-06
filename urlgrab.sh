@@ -30,8 +30,8 @@ do
 	then
 		run_curl $START &
 		START=$(($START+1))
-    else
-        sleep 0.1
+	else
+		sleep 0.1
 	fi
 
 done
