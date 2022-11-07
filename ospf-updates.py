@@ -5,7 +5,6 @@ import os
 import json
 from collections import defaultdict
 from subprocess import Popen, PIPE
-from pprint import pprint
 
 """ Read PCAP file containing OSPF Router LSAs and summarize them """
 
