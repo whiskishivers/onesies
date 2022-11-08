@@ -3,14 +3,18 @@
 # Download files and then delete them using the web API.
 # Usage example: ./script.sh 1 500
 
-JOBCOUNT=20 # Maximum concurrent requests/downloads
-ENDPOINT='http://localhost:5000/image/'
+JOB_LIMIT=30 # Maximum concurrent requests/downloads
+BASE_URL='http://localhost:5000/record'
 START=$1
 END=$2
 
 run_curl() {
-	curl -f -C- -sSOJL $ENDPOINT$1 &&
-	curl -sX DELETE $ENDPOINT$1 -o /dev/null
+	DATA_URL="$BASE_URL/$1/data"
+	DELETE_URL="$BASE_URL/$1"
+
+	curl -f -C- -sSOJL $DATA_URL &&
+	curl -sX DELETE $DELETE_URL -o /dev/null
+
 	if [ $? -eq 0 ]
 	then
 		RESULT="." # Success
@@ -26,7 +30,8 @@ echo "Downloading to $(pwd)"
 while [ $START -lt $(($END+1)) ]
 do
 	# Run function while process count is below threshold
-	if [ $(pgrep curl 2>/dev/null | wc -l) -lt $JOBCOUNT ]
+	JOB_COUNT=$(pgrep -u $USER curl 2>/dev/null | wc -l)
+	if [ $JOB_COUNT -lt $JOB_LIMIT ]
 	then
 		run_curl $START &
 		START=$(($START+1))
