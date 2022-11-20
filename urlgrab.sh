@@ -4,16 +4,20 @@
 # Usage example: ./script.sh 1 500
 
 BASE_URL="http://localhost:5000/record"
-MOUNT_DIR="/media/$USER/elements" # Full path to mounted hard drive
-DOWNLOAD_DIR="$(hostname)_$(date +%Y%m%d_%H%M)"
-JOB_LIMIT=25
+MOUNT_DIR="/media/$USER/elements"
+DOWNLOAD_DIR="$HOSTNAME_$(date +%Y%m%d_%H%M)"
+JOB_LIMIT=4
+
+START=$1
+END=$2
+JOBCOUNT_PEAK=0
 
 run_curl() {
 	DATA_URL="$BASE_URL/$1/data"
 	DELETE_URL="$BASE_URL/$1"
-	(curl -f -sSOJL $DATA_URL &&
-	curl -sX DELETE $DELETE_URL -o /dev/null) ||
-	sleep 1
+	(/usr/bin/curl -f -sSOJL $DATA_URL &&
+	/usr/bin/curl -sX DELETE $DELETE_URL -o /dev/null && return 0) ||
+	sleep 1 && return 1
 }
 
 # Check for mounted device.
@@ -21,16 +25,12 @@ run_curl() {
 	echo "No device mounted to $MOUNT_DIR" &&
 	exit 1
 
-START=$1
-END=$2
-JOBCOUNT_PEAK=0
-
 # Create download directory on device
 cd $MOUNT_DIR
-mkdir -p $DOWNLOAD_DIR
-cd $DOWNLOAD_DIR
+mkdir -pv $DOWNLOAD_DIR
 
-echo "Downloading to $(pwd)"
+cd $DOWNLOAD_DIR
+echo "Downloading to $PWD"
 while [ $START -lt $(($END+1)) ]
 do
 	# Run curl if the job limit isn't reached
@@ -44,15 +44,12 @@ do
 		#wait
 		sleep 0.1
 	fi
-	
-	# Performance testing stuff
-	if [ $JOB_COUNT -gt $JOBCOUNT_PEAK ]
-	then
-		JOBCOUNT_PEAK=$JOB_COUNT
-	fi
+
+	[ $JOB_COUNT -gt $JOBCOUNT_PEAK ] && JOBCOUNT_PEAK=$JOB_COUNT
 done
 
 wait
-ls -lh
+
 echo "Done!"
-#echo "Job peak: $JOBCOUNT_PEAK"
+#ls -lh
+echo "Job peak: $JOBCOUNT_PEAK"
