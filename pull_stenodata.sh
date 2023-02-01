@@ -12,7 +12,7 @@ SERVERS=(
 
 run_rsync() {
 	# Args: $1: IP, $2: Local dir
-	rsync -r --stats --exclude=".*" --chmod=F644 ops@$1:/data/stenographer/ $2 &&
+	rsync -rh -e "ssh -q" --stats --exclude=".*" --chmod=F644 ops@$1:/data/stenographer/ $2 &&
 	echo "[*] Successful $1 pull."
 }
 
@@ -37,5 +37,3 @@ done
 wait
 
 echo "Script finished."
-
-
