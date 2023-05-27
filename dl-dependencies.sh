@@ -14,7 +14,7 @@ mkdir -p $TOPDIR/$1/dependencies &&
 cd $TOPDIR/$1 &&
 apt-get download $1 &&
 cd dependencies
-apt-get download $(apt-cache depends $1 | grep "Depends:" | awk '{print $2}')
+apt-get download $(apt-cache depends $1 | grep "Depends:" | awk '{print $2}' | grep -v "<")
 
 # Install downloaded packages
 #apt-get install ./*.deb
