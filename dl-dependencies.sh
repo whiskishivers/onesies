@@ -1,20 +1,26 @@
 #bin/bash
 
-# Download a package from the repo, including dependencies
+# Download packages found in pkgs.txt and all dependencies (recursive).
 
-if [ -z $1 ]; then 
-	echo "Usage: ./dl-dependencies.sh <pkg>"
-	exit 1;
-fi
+get_deb() {
+	echo " * Downloading $1..."
+	apt-get download -qq $1 2>/dev/null&&
+	for i in $(apt-rdepends -s DEPENDS $1 | grep "^\w" | sort -u);
+	do
+		apt-get download -qq $i 2>/dev/null
+	done
+}
 
 
-TOPDIR=$(realpath $(dirname $0))
+apt-get update || exit 1
 
-mkdir -p $TOPDIR/$1/dependencies &&
-cd $TOPDIR/$1 &&
-apt-get download $1 &&
-cd dependencies
-apt-get download $(apt-cache depends $1 | grep "Depends:" | awk '{print $2}' | grep -v "<")
+echo "Downloading packages found in pkgs.txt..."
 
-# Install downloaded packages
-#apt-get install ./*.deb
+for i in $(cat pkgs.txt); do
+	get_deb $i &
+	while [ $(jobs -r | wc -l) -gt 9 ]; do
+		sleep 0.1
+	done
+done
+wait
+echo "Script finished."
