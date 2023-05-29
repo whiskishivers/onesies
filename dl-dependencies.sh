@@ -13,9 +13,8 @@ get_deb() {
 }
 
 apt-get update || exit 1
-mkdir -p offline-repo
+mkdir -p offline-repo/debs
 cd offline-repo
-mkdir -p debs
 
 echo "Downloading packages found in pkgs.txt..."
 for i in $(cat ../pkgs.txt); do
