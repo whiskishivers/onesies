@@ -18,7 +18,7 @@ cd offline-repo
 mkdir -p debs
 
 echo "Downloading packages found in pkgs.txt..."
-for i in $(cat pkgs.txt); do
+for i in $(cat ../pkgs.txt); do
 	get_deb $i &
 	while [ $(jobs -r | wc -l) -gt 19 ]; do
 		sleep 0.1
