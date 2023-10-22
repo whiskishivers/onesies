@@ -3,35 +3,33 @@
 import csv
 import random
 
-# Reads a csv file with watchstander name and watch count columns.
+# Randomly picks watchstanders from a csv file with name and points columns.
+# Lower points are more likely to be selected.
 # Output is in selection order.
-# Prioritizes lower watch counts for selection.
+
 
 def get_score(n, highest):
-	return highest + 1 - n
+	# Subtract points from the highest in the pool. Adds one to prevent scores of zero.
+	return highest - n + 1
 
-# Put watchstanders and watch counts into lists
-ws = []
-c = []
+# Read file, put names and points into seperate lists
+watchstanders = []
+points = []
 with open('book1.csv','r') as f:
 	reader = csv.reader(f.readlines())
 	for row in reader:
-		ws.append(f"{row[0].ljust(15)} {row[1]}")
-		c.append(int(row[1]))
+		watchstanders.append(f"{row[1].ljust(4)}{row[0]}")
+		points.append(int(row[1]))
 
-# Score priority
-highest = max(c)
-scores = [get_score(i, highest) for i in c]
-
-# Make selections
-ws_count = len(ws)
+# Calculate scores and make selections
+highest = max(points)
+scores = [get_score(i, highest) for i in points]
+ws_count = len(watchstanders)
 selected = []
 while len(selected) < ws_count:
-	pick = random.sample(ws, k=1, counts=scores)[0]
-	idx = ws.index(pick)
-	del ws[idx]
-	del c[idx]
-	del scores[idx]
+	pick = random.sample(watchstanders, k=1, counts=scores)[0]
+	idx = watchstanders.index(pick)
+	for i in watchstanders, points, scores:
+		del i[idx]
 	selected.append(pick)
 	print(pick)
-
