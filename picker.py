@@ -1,47 +1,68 @@
 #!/usr/bin/python3
 
 import csv
-import random
+from random import choices
+from statistics import median
 
 """
-Randomly picks watchstanders from a csv file. Column 0 is name, column 1 is points.
-Watchstanders with lower points are more likely to be picked. Output is in selection order.
+Randomly picks watchstanders from a csv file (with header row).
+Column 0 must be name, column 1 must be points. Other columns are ignored.
+Lower points are more likely to be selected.
 """
 
-def weigh_in(n, highscore):
-	return highscore - n + 1
+class Watchstander:
+	def __init__(self, csvrow):	
+		self.row = csvrow
+		
+	def __str__(self):
+		return f"{self.name.ljust(15)} {str(self.points).rjust(3)}"
+		
+	@property
+	def name(self):
+		return self.row[0]
+
+	@property
+	def points(self):
+		return int(self.row[1])
+
+	@points.setter
+	def points(self, n: int):
+		self.row[1] = str(n)
+
+	@property
+	def weight(self):
+		return max_score - self.points + 1
+
 
 # Read file, make list
-watchstanders = []
+rows = []
 with open('book1.csv', 'r') as f:
 	reader = csv.reader(f.readlines())
-	for row in reader:
-		watchstanders.append(row)
+	rows = [i for i in reader]
+header_row = rows[0]
+watchstanders = [Watchstander(i) for i in rows[1:]]
+del rows
 
-# Skip row header
-row_header = None
-if "name" in watchstanders[0][0].lower():
-	row_header = watchstanders[0]
-	del watchstanders[0]
+# quickmaths
+points = [i.points for i in watchstanders]
+min_score, max_score = min(points), max(points)
+median_score = median(points)
 
-# Make selections
-points = [int(w[1]) for w in watchstanders]
-highscore = max(points)
-weights = [weigh_in(i, highscore) for i in points]
+print(f"Median score: {median_score}")
+print(f"Spread:       {max_score - min_score}")
+print("---")
+
 selected = []
 while len(watchstanders) > 0:
-	pick = random.choices(watchstanders, weights=weights)[0]
-	idx = watchstanders.index(pick)
+	pick = choices(watchstanders, weights=[w.weight for w in watchstanders])[0]
+	del watchstanders[watchstanders.index(pick)]
 	selected.append(pick)
-	
-	print(f"{pick[0]}")
-	del watchstanders[idx]
-	del weights[idx]
-	
-# Save results
+	print(f"{pick} " + "." * int((pick.points / median_score)))
+
+# Save new csv file in selection order
 with open('selected.csv', 'w') as f:
 	writer = csv.writer(f)
-	if row_header is not None:
-		writer.writerow(row_header)
-	writer.writerows(selected)
-print("Selection saved to selected.csv")
+	writer.writerow(header_row)
+	writer.writerows([i.row for i in selected])
+	print("---")
+	print("Output saved to selected.csv")
