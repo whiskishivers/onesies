@@ -74,9 +74,10 @@ def make_selection(watchstanders, pick_ratio):
     return selected, median_score
 
 
-def save_csv(file_path: str, header_row: list, selected: list) -> None:
+def save_csv(file_path: str, selected: list) -> None:
+    fieldnames = list(selected[0].row.keys())
     with open(file_path, 'w', newline='') as f:
-        writer = csv.DictWriter(f)
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows([i.row for i in selected])
 
