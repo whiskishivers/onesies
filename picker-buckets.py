@@ -72,7 +72,7 @@ def save_csv(file_path: str, selected: list) -> None:
     with open(file_path, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows([i.row for i in selected])
+        writer.writerows(i.row for i in selected)
 
 
 def main():
