@@ -5,18 +5,11 @@ from random import choices
 from statistics import median
 
 """
-Made to assist in watchbill creation. Reads a csv file that includes a
-header row with at least "Name" and "Points" columns. Splits watchstanders
-by median points, then randomly picks based on the defined ratio and points.
-Lower scores are more likely to be selected before higher scores.
-Creates a new csv file with the rows in order of selection.
+Assists watchbill creation. Reads a csv file with "Name", "Points", and "Notes"
+fields at minimum. Creates low and high groups based on the median score then
+randomly selects watchstanders in each group, preferring lower scores first.
+Saves a new csv file in selection order.
 """
-
-# Select x from the lower score group before selecting y from the higher group.
-x: int = 5
-y: int = 1
-
-PICK_RATIO = (x, y)
 
 
 class Watchstander:
@@ -40,42 +33,42 @@ class Watchstander:
 
     @property
     def weight(self):
+        """The inverse of points."""
+        if self.points < 0:
+            return 1.0
         return 1 / (self.points + 1)
 
 
 def read_csv(file_path: str):
+    """Reads rows, returns list of Watchstander objects."""
     with open(file_path, 'r') as f:
         reader = csv.DictReader(f)
-        watchstanders = [Watchstander(i) for i in reader]
+        watchstanders = [Watchstander(row) for row in reader]
     return watchstanders
 
 
-def make_selection(watchstanders, pick_ratio):
+def make_selection(watchstanders):
+    """Returns new selection lists and the median score."""
     median_score = median([i.points for i in watchstanders])
-    # Split low and high points
     low_bucket, high_bucket = [], []
-    for i in watchstanders:
-        if i.points < median_score:
-            low_bucket.append(i)
+    weights = [i.weight for i in watchstanders]
+
+    while len(watchstanders):
+        idx = choices(range(len(watchstanders)), weights=weights)[0]
+        pick = watchstanders[idx]
+        if pick.points < median_score:
+            low_bucket.append(pick)
         else:
-            high_bucket.append(i)
+            high_bucket.append(pick)
+        del watchstanders[idx]
+        del weights[idx]
 
-    selected = []
-    while len(low_bucket) + len(high_bucket) > 0:
-        for bucket, ratio in [(low_bucket, pick_ratio[0]), (high_bucket, pick_ratio[1])]:
-            try:
-                for _ in range(ratio):
-                    pick = choices(bucket, weights=[w.weight for w in bucket])[0]
-                    del bucket[bucket.index(pick)]
-                    selected.append(pick)
-            except IndexError:
-                continue
-
-    return selected, median_score
+    return low_bucket, high_bucket, median_score
 
 
 def save_csv(file_path: str, selected: list) -> None:
-    fieldnames = list(selected[0].row.keys())
+    """Create new csv file."""
+    fieldnames = selected[0].row.keys()
     with open(file_path, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -87,15 +80,20 @@ def main():
     output_file = 'selected.csv'
 
     watchstanders = read_csv(input_file)
-    selected, med_score = make_selection(watchstanders, PICK_RATIO)
+    low_bucket, high_bucket, med_score = make_selection(watchstanders)
+    selection_list = low_bucket + high_bucket
 
-    print("---Selection Order---")
-    print('\n'.join(map(str, selected)))
-    print(f"Median: {med_score}")
-    print(f"Count: {len(watchstanders)}")
+    print(f"---{len(low_bucket)} Below Median---")
+    print('\n'.join(map(str, low_bucket)))
+    print(f"---{len(high_bucket)} Above Median---")
+    print('\n'.join(map(str, high_bucket)))
+    print("---")
+    print(f"Count: {len(selection_list)}")
+    print(f"Median score: {med_score}")
 
-    save_csv(output_file, selected)
-    print("Output saved to", output_file)
+    save_csv(output_file, selection_list)
+
+    print(f'Output saved to {output_file}')
 
 
 if __name__ == "__main__":
