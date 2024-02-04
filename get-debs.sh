@@ -2,8 +2,6 @@
 
 # Download installed packages for an offline repo
 
-touch uris.txt
-touch installed.txt
 mkdir -p debs
 cd debs
 dpkg -l | grep "^ii" | awk '{print $2}' | xargs -n 20 apt-get download
