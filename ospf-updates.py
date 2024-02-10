@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import argparse
-import os
 import json
 from collections import defaultdict
 from subprocess import Popen, PIPE
@@ -22,10 +21,10 @@ with open(args.filename, "rb") as f:
         r = p.communicate(input=f.read())
 packets = json.loads(r[0])
 
-link_labels = {"1": ("Type 1 PTP    ", "Neighbor ID:", "Router IP:  "),
-               "2": ("Type 2 Transit", "Link ID:    ", "Link Data:  "),
-               "3": ("Type 3 Stub   ", "Network:    ", "Mask:       "),
-               "4": ("Type 4 Virtual", "Link ID:    ", "Link Data:  ")
+link_labels = {"1": ("1 PTP    ", "Neighbor:", "Router IP:  "),
+               "2": ("2 Transit", "Link ID: ", "Link Data:  "),
+               "3": ("3 Stub   ", "Network: ", "Mask:       "),
+               "4": ("4 Virtual", "Link ID: ", "Link Data:  ")
                }
 lsa_type_field_names = ["ospf.lsa.router.linktype", "ospf.lsa.router.linkid", "ospf.lsa.router.linkdata"]
 entries = defaultdict(set)
@@ -38,7 +37,6 @@ for pkt in packets:
         for lsa_type, lsa_type_fields in lsa_update.items():
             if lsa_type.startswith("LSA-type "):
                 router_id = lsa_type_fields["ospf.lsa.id"]
-                print(f"==={lsa_type}===")
                 for field, v in lsa_type_fields.items():
                     if field.startswith("Type:"):
                         data = tuple([v[i] for i in lsa_type_field_names])
@@ -49,7 +47,7 @@ for pkt in packets:
         continue
 
 # Output
-print(f"Summary of {counter} link-state update packets.")
+print(f"Summary of {len(packets)} packets and {counter} updates.")
 for k, v in entries.items():
     print(f"Router: {k}")
     for line in sorted(v):
