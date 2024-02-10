@@ -8,60 +8,54 @@ from subprocess import Popen, PIPE
 
 """ Read PCAP file containing OSPF Router LSAs and summarize them """
 
-TSHARK = '/usr/bin/tshark'
-
-
 parser = argparse.ArgumentParser(
-    description = "Summarize links found in OSPF packets from a PCAP file."
+    description="Summarize links found in OSPF link state advertisements."
 )
-parser.add_argument('filename', help = "The path to the PCAP file.")
+parser.add_argument("filename", help="pcap file path")
+parser.add_argument("--tshark", default="/usr/bin/tshark", help="path to tshark binary (default: /usr/bin/tshark)")
 args = parser.parse_args()
 
-path = args.filename
-
-
-# Labels for Router lsa types
-# (Type field, Link ID field, Link Data field)
-linklabels = {"1": ("Type: PTP    ", "Neighbor ID:", "Router IP:  "),
-              "2": ("Type: Transit", "Link ID:    ", "Link Data:  "),
-              "3": ("Type: Stub   ", "Network:    ", "Mask:       "),
-              "4": ("Type: Virtual", "Link ID:    ", "Link Data:  ")
-}
-
-fields = ["ospf.lsa.router.linktype","ospf.lsa.router.linkid", "ospf.lsa.router.linkdata"]
-
-# Read pcap into memory, feed tshark, get jsonified OSPF LS Update packets
-with open(path,'rb') as f:
-    with Popen([TSHARK, '-r-', '-Tjson', '-Y', 'ospf.lsa.number_of_links gt 0 && ospf.lsa == 1'], stdin=PIPE, stdout=PIPE) as p:
+# Read pcap, pipe to tshark, get json
+with open(args.filename, "rb") as f:
+    with Popen([args.tshark, "-r-", "-Tjson", "-Y", "ospf.lsa.number_of_links gt 0 and ospf.lsa eq 1"], stdin=PIPE,
+               stdout=PIPE) as p:
         r = p.communicate(input=f.read())
+packets = json.loads(r[0])
 
-pkts = json.loads(r[0])
-
+link_labels = {"1": ("Type 1 PTP    ", "Neighbor ID:", "Router IP:  "),
+               "2": ("Type 2 Transit", "Link ID:    ", "Link Data:  "),
+               "3": ("Type 3 Stub   ", "Network:    ", "Mask:       "),
+               "4": ("Type 4 Virtual", "Link ID:    ", "Link Data:  ")
+               }
+lsa_type_field_names = ["ospf.lsa.router.linktype", "ospf.lsa.router.linkid", "ospf.lsa.router.linkdata"]
 entries = defaultdict(set)
+counter = 0
 
-# Parse packets, put Type field information into entries dictionary
-for pkt in pkts:
+# Parse update packets for links
+for pkt in packets:
     try:
-        lsaupdate = pkt["_source"]["layers"]["ospf"]["LS Update Packet"]
-        for lsatype,typefields in lsaupdate.items():
-            if lsatype.startswith("LSA-type "):
-                routerid = typefields["ospf.lsa.id"]
-                print(f"==={lsatype}===")
-                for field, v in typefields.items():
+        lsa_update = pkt["_source"]["layers"]["ospf"]["LS Update Packet"]
+        for lsa_type, lsa_type_fields in lsa_update.items():
+            if lsa_type.startswith("LSA-type "):
+                router_id = lsa_type_fields["ospf.lsa.id"]
+                print(f"==={lsa_type}===")
+                for field, v in lsa_type_fields.items():
                     if field.startswith("Type:"):
-                        data = tuple([v[i] for i in fields])
-                        entries[routerid].add(data)
+                        data = tuple([v[i] for i in lsa_type_field_names])
+                        entries[router_id].add(data)
+                        counter += 1
     except:
+        print("error")
         continue
 
 # Output
+print(f"Summary of {counter} link-state update packets.")
 for k, v in entries.items():
     print(f"Router: {k}")
     for line in sorted(v):
-        typeid, linkid, datafield = line
-        labels = linklabels[typeid]
+        type_id, link_id, link_data = line
+        label = link_labels[type_id]
         star = ""
-        if typeid in ("1") and linkid in entries.keys():
+        if type_id in "1" and link_id in entries.keys():
             star = "*"
-        print(f"    {labels[0]} {labels[1]} {str(linkid + star).ljust(15)} {labels[2]} {datafield}")
-
+        print(f" {label[0]} {label[1]} {str(link_id + star).ljust(15)} {label[2]} {link_data}")
