@@ -8,7 +8,7 @@ from subprocess import Popen, PIPE
 """ Read PCAP file containing OSPF Router LSAs and summarize them """
 
 parser = argparse.ArgumentParser(
-    description="Summarize links found in OSPF link state advertisements."
+    description="Summarize OSPF link state updates found in a pcap."
 )
 parser.add_argument("filename", help="pcap file path")
 parser.add_argument("--tshark", default="/usr/bin/tshark", help="path to tshark binary (default: /usr/bin/tshark)")
@@ -21,10 +21,10 @@ with open(args.filename, "rb") as f:
         r = p.communicate(input=f.read())
 packets = json.loads(r[0])
 
-link_labels = {"1": ("1 PTP    ", "Neighbor:", "Router IP:  "),
-               "2": ("2 Transit", "Link ID: ", "Link Data:  "),
-               "3": ("3 Stub   ", "Network: ", "Mask:       "),
-               "4": ("4 Virtual", "Link ID: ", "Link Data:  ")
+link_labels = {"1": ("1-PTP    ", "Rtr ID:", "Interface:"),
+               "2": ("2-Transit", "Rtr ID:", "Interface:"),
+               "3": ("3-Stub   ", "Net ID:", "Mask:     "),
+               "4": ("4-Virtual", "ID:    ", "Data:     ")
                }
 lsa_type_field_names = ["ospf.lsa.router.linktype", "ospf.lsa.router.linkid", "ospf.lsa.router.linkdata"]
 entries = defaultdict(set)
@@ -34,20 +34,23 @@ counter = 0
 for pkt in packets:
     try:
         lsa_update = pkt["_source"]["layers"]["ospf"]["LS Update Packet"]
-        for lsa_type, lsa_type_fields in lsa_update.items():
-            if lsa_type.startswith("LSA-type "):
-                router_id = lsa_type_fields["ospf.lsa.id"]
-                for field, v in lsa_type_fields.items():
-                    if field.startswith("Type:"):
-                        data = tuple([v[i] for i in lsa_type_field_names])
-                        entries[router_id].add(data)
-                        counter += 1
+        try:
+            for lsa_type, lsa_type_fields in lsa_update.items():
+                if lsa_type.startswith("LSA-type "):
+                    router_id = lsa_type_fields["ospf.lsa.id"]
+                    for field, v in lsa_type_fields.items():
+                        if field.startswith("Type:"):
+                            data = tuple([v[i] for i in lsa_type_field_names])
+                            entries[router_id].add(data)
+                            counter += 1
+        except:
+            continue
     except:
         print("error")
         continue
 
 # Output
-print(f"Summary of {len(packets)} packets and {counter} updates.")
+print(f"Summary of {len(packets)} update packets with {counter} LSAs.")
 for k, v in entries.items():
     print(f"Router: {k}")
     for line in sorted(v):
@@ -57,3 +60,4 @@ for k, v in entries.items():
         if type_id in "1" and link_id in entries.keys():
             star = "*"
         print(f" {label[0]} {label[1]} {str(link_id + star).ljust(15)} {label[2]} {link_data}")
+        
