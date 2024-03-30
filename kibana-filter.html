@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Match filter for Kibana</title>
+</head>
+<body>
+    <h2>Match filter for kibana</h2>
+    <p>
+        Creates a filter that matches one field to many lines. Copy and paste result into a custom dashboard filter.
+    </p>
+    <form id="textLineForm">
+        <label>Kibana field to match:</label>
+        <input type="text" id="fieldNameInput" placeholder="Kibana field name"><br><br>
+        <label>Values to match:</label><br>
+        <textarea id="textLineInput" rows="10" cols="50" placeholder="Paste values here. One per line."></textarea><br>
+        <button type="submit">Make Filter</button>
+    </form>
+
+    <div id="savedJsonDisplay" style="margin-top: 20px;">
+        <h3>Result:</h3>
+        <textarea id="jsonOutput" rows="10" cols="50" readonly></textarea><br>
+        <button onclick="copyJson()">Copy</button>
+    </div>
+
+    <script>
+        function makeKibanaFilter(textData, customField) {
+            const uniqueLines = Array.from(new Set(textData.split('\n').filter(line => line.trim() !== '')));
+            const wrappedLines = uniqueLines.map(filteredLine => {
+                let wrappedObject = { "match_phrase": {} };
+                wrappedObject["match_phrase"][customField] = filteredLine.trim();
+                return wrappedObject;
+            });
+            const jsonObject = {query: {bool: {should: wrappedLines, minimum_should_match: 1 }}};
+            const jsonString = JSON.stringify(jsonObject, null, 1);
+            document.getElementById('jsonOutput').value = jsonString;
+        }
+
+        function copyJson() {
+            const jsonOutput = document.getElementById('jsonOutput');
+            jsonOutput.select();
+            document.execCommand('copy');
+            alert('Copied to clipboard.');
+        }
+
+        // Submit listener
+        document.getElementById('textLineForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            // set default kibana field value if blank
+            if (!document.getElementById('fieldNameInput').value) {
+                document.getElementById('fieldNameInput').value = 'related.ip';
+            }
+            
+            const textData = document.getElementById('textLineInput').value;
+            const customField = document.getElementById('fieldNameInput').value.trim();
+            makeKibanaFilter(textData, customField);
+        });
+    </script>
+</body>
+</html>
