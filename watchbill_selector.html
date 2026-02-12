@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Watchbill Selection Assistant - Dark Pro</title>
+    <style>
+        :root {
+            --primary: #63b3ed;
+            --secondary: #48bb78;
+            --bg: #1a202c;
+            --card-bg: #2d3748;
+            --text: #f7fafc;
+            --text-muted: #a0aec0;
+            --warning: #f6ad55;
+            --border: #4a5568;
+        }
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 40px; background: var(--bg); color: var(--text); line-height: 1.6; }
+        .container { max-width: 1200px; margin: auto; background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        
+        #instructions { background: #2c5282; border-left: 5px solid var(--primary); padding: 25px; border-radius: 8px; margin-bottom: 30px; color: #ebf8ff; }
+        .upload-zone { border: 2px dashed var(--border); padding: 30px; text-align: center; border-radius: 8px; background: #2d3748; transition: 0.3s; }
+        .upload-zone:hover { border-color: var(--primary); }
+        
+        /* Controls Area */
+        .controls-active { display: none; flex-direction: column; gap: 20px; margin-bottom: 20px; padding: 20px; background: #1a202c; border-radius: 8px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        #searchInput { width: 100%; padding: 12px; background: #2d3748; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 1rem; color: white; }
+        #filterControls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+
+        /* Table Styling */
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; display: none; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        th { background: #2d3748; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); }
+        
+        /* Dark Theme Point Controls */
+        .pt-ctrl { display: flex; align-items: center; gap: 10px; color: #1a202c; font-weight: bold; }
+        .btn-adj { 
+            width: 28px; height: 28px; 
+            border: 1px solid var(--border); 
+            background: var(--bg); 
+            color: var(--text);
+            border-radius: 4px; cursor: pointer; 
+            transition: 0.2s;
+        }
+        .btn-adj:hover { border-color: var(--primary); background: var(--card-bg); }
+        .mod-row { border-left: 4px solid var(--warning); background: #3c362a !important; }
+
+        /* Buttons */
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-p { background: var(--primary); color: #1a202c; }
+        .btn-s { background: var(--secondary); color: white; }
+        .btn-w { background: var(--warning); color: #1a202c; }
+
+        .notes-input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: #1a202c; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Watchbill Selection Assistant</h2>
+
+    <div id="instructions">
+        <p>Load your CSV roster file with at least the following headers: <code>Name Points Notes</code></p>
+        <p>Watchstanders are selected using a weighted random probability, where LOWER scores tend to be selected first.</p>
+        <p>Make adjustments to points as you add them to the watchbill. Save your changes by clicking <b>Download CSV</b>.
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+        <input type="file" id="csvFile" accept=".csv" style="margin-bottom: 10px;"><br>
+        <button class="btn btn-p" onclick="handleFileUpload()">Load Roster</button>
+    </div>
+
+    <div class="controls-active" id="activeControls">
+        <input type="text" id="searchInput" placeholder="Search by name..." onkeyup="render()">
+        <div id="filterControls">
+            <button class="btn btn-s" onclick="setFilter('all', this)">Show All</button>
+            <button class="btn btn-p" onclick="setFilter('above', this)">Above Median</button>
+            <button class="btn btn-p" onclick="setFilter('below', this)">At or Below Median</button>
+        </div>
+        <div class="top-bar">
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-w" onclick="incrementAllPoints(-1)">All -1</button>
+                <button class="btn btn-s" onclick="incrementAllPoints(1)">All +1</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div id="statsDisplay" style="font-weight: bold; color: var(--primary);"></div>
+                <button class="btn btn-w" onclick="recalculate()">Shuffle & Recalculate</button>
+                <button class="btn btn-s" id="downloadBtn">Download CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <table id="watchTable">
+        <thead><tr><th>Order</th><th>NAME</th><th>Points</th><th>Notes</th></tr></thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    let masterData = [];
+    let headers = [];
+    let currentFilter = 'all';
+
+    async function handleFileUpload() {
+        const file = document.getElementById('csvFile').files[0];
+        if (!file) return;
+
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        headers = lines[0].split(',').map(h => h.trim());
+        
+        masterData = lines.slice(1).map(line => {
+            const values = line.split(',').map(v => v.trim());
+            const obj = headers.reduce((acc, h, i) => ({...acc, [h]: values[i]}), {});
+            
+            const pointKey = Object.keys(obj).find(k => k.toLowerCase() === 'points');
+            const noteKey = Object.keys(obj).find(k => k.toLowerCase() === 'notes');
+            
+            obj.Points = parseInt(obj[pointKey]) || 0;
+            obj._originalPoints = obj.Points;
+            obj.Notes = obj[noteKey] || '';
+            return obj;
+        });
+
+        document.getElementById('instructions').style.display = 'none';
+        document.getElementById('uploadZone').style.display = 'none';
+        document.getElementById('activeControls').style.display = 'flex';
+        document.getElementById('watchTable').style.display = 'table';
+
+        recalculate();
+    }
+    
+    function setFilter(filterType, btnElement) {
+        currentFilter = filterType;
+        document.querySelectorAll('#filterControls .btn').forEach(btn => {
+            btn.classList.add('btn-p');
+            btn.classList.remove('btn-s');
+        });
+        btnElement.classList.add('btn-s');
+        btnElement.classList.remove('btn-p');
+        render();
+    }
+
+    function recalculate() {
+        let pool = [...masterData];
+        let pickedOrder = [];
+        while (pool.length > 0) {
+            const weights = pool.map(p => p.Points + 1);
+            const totalWeight = weights.reduce((a, b) => a + b, 0);
+            let r = Math.random() * totalWeight;
+            let idx = 0;
+            for (let i = 0; i < weights.length; i++) {
+                r -= weights[i];
+                if (r <= 0) { idx = i; break; }
+            }
+            pickedOrder.push(pool.splice(idx, 1)[0]);
+        }
+        masterData = pickedOrder.reverse();
+        render();
+    }
+
+    function adjustPoints(indexInMaster, delta) {
+        masterData[indexInMaster].Points = Math.max(0, masterData[indexInMaster].Points + delta);
+        render(); 
+    }
+    
+    function updateNote(indexInMaster, newNote) {
+        masterData[indexInMaster].Notes = newNote;
+    }
+
+    function incrementAllPoints(n) {
+        masterData.forEach(item => { item.Points = Math.max(0, item.Points + n); });
+        render();
+    }
+
+    function render() {
+        const tbody = document.querySelector("#watchTable tbody");
+        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+        tbody.innerHTML = "";
+
+        if (masterData.length === 0) return;
+
+        const pts = masterData.map(d => d.Points);
+        const sortedPts = [...pts].sort((a, b) => a - b);
+        let median = sortedPts.length % 2 === 0 
+            ? (sortedPts[sortedPts.length / 2 - 1] + sortedPts[sortedPts.length / 2]) / 2 
+            : sortedPts[Math.floor(sortedPts.length / 2)];
+
+        const minP = Math.min(...pts);
+        const maxP = Math.max(...pts);
+        let visibleCount = 0;
+
+        masterData.forEach((item, masterIndex) => {
+            const nameKey = Object.keys(item).find(k => k.toLowerCase() === 'name');
+            if (searchTerm && !item[nameKey].toLowerCase().includes(searchTerm)) return;
+            if (currentFilter === 'above' && item.Points <= median) return;
+            if (currentFilter === 'below' && item.Points > median) return;
+            
+            visibleCount++;
+            const row = tbody.insertRow();
+            if (item.Points !== item._originalPoints) row.className = "mod-row";
+            
+            // Refined Dark-Mode Gradient (Electric Blue to Vivid Purple)
+            let color = '#2d3748';
+            if (maxP !== minP) {
+                const ratio = (item.Points - minP) / (maxP - minP);
+                // Start: rgb(120, 210, 255) | End: rgb(180, 140, 255)
+                const r = Math.floor(120 + (180 - 120) * ratio);
+                const g = Math.floor(210 + (140 - 210) * ratio);
+                const b = 255;
+                color = `rgb(${r}, ${g}, ${b})`;
+            }
+
+            row.innerHTML = `
+                <td>${masterIndex + 1}</td>
+                <td>${item[nameKey]}</td>
+                <td style="background-color: ${color}">
+                    <div class="pt-ctrl">
+                        <button class="btn-adj" onclick="adjustPoints(${masterIndex}, -1)">-</button>
+                        <b>${item.Points}</b>
+                        <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 1)">+</button>
+                        <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 3)">+3</button>
+                        <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 4)">+4</button>
+                    </div>
+                </td>
+                <td><input type="text" class="notes-input" value="${item.Notes}" onchange="updateNote(${masterIndex}, this.value)"></td>
+            `;
+        });
+
+        document.getElementById('statsDisplay').innerText = `Roster: ${masterData.length} | Showing: ${visibleCount} | Median: ${median.toFixed(1)}`;
+
+        document.getElementById('downloadBtn').onclick = () => {
+            const sanitize = (val) => String(val).replace(/,/g, ''); 
+            const csvRows = [headers.join(',')];
+            masterData.forEach(item => {
+                const row = headers.map(h => sanitize(item[h] || ""));
+                csvRows.push(row.join(','));
+            });
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'updated_watchbill.csv'; a.click();
+        };
+    }
+</script>
+</body>
+</html>

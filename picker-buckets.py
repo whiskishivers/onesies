@@ -1,99 +1,90 @@
-#!/usr/bin/python3
-
 import csv
-from random import choices
+import random
 from statistics import median
-
-"""
-Assists watchbill creation. Reads a csv file with "Name", "Points", and "Notes"
-fields at minimum. Creates low and high groups based on the median score then
-randomly selects watchstanders in each group, preferring lower scores first.
-Saves a new csv file in selection order.
-"""
+from dataclasses import dataclass
+from typing import List
 
 
+@dataclass
 class Watchstander:
-    def __init__(self, csvrow):
-        self.row = csvrow
-
-    def __str__(self):
-        return f"{self.name.ljust(15)} {str(self.points).rjust(3)}  {self.notes}"
-
-    @property
-    def name(self):
-        return self.row["Name"]
+    name: str
+    points: int
+    notes: str
+    shift_pref: str
+    original_row: dict
+    status: str = ""  # above or below median
 
     @property
-    def notes(self):
-        return self.row["Notes"]
-
-    @property
-    def points(self):
-        return int(self.row["Points"])
-
-    @property
-    def weight(self):
-        """The inverse of points."""
-        if self.points < 0:
-            return 1.0
-        return 1 / (self.points + 1)
+    def weight(self) -> float:
+        """Higher points = Higher chance of being picked early (to be flipped to the bottom)."""
+        return float(self.points + 1)
 
 
-def read_csv(file_path: str):
-    """Reads rows, returns list of Watchstander objects."""
-    with open(file_path, 'r') as f:
-        reader = csv.DictReader(f)
-        watchstanders = [Watchstander(row) for row in reader]
+def read_watchstanders(file_path: str) -> List[Watchstander]:
+    watchstanders = []
+    try:
+        with open(file_path, mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                watchstanders.append(Watchstander(
+                    name=row.get("Name", "Unknown"),
+                    points=int(row.get("Points", 0)),
+                    notes=row.get("Notes", ""),
+                    shift_pref=row.get("Shift Preference", ""),
+                    original_row=row
+                ))
+    except FileNotFoundError:
+        print(f"Error: {file_path} not found.")
+        return []
     return watchstanders
 
 
-def make_selection(watchstanders):
-    """Returns new selection lists and the median score."""
-    median_score = median([i.points for i in watchstanders])
-    low_bucket, high_bucket = [], []
-    weights = [i.weight for i in watchstanders]
+def perform_weighted_selection(pool: List[Watchstander]) -> List[Watchstander]:
+    if not pool:
+        return []
 
-    while len(watchstanders):
-        idx = choices(range(len(watchstanders)), weights=weights)[0]
-        pick = watchstanders[idx]
-        if pick.points < median_score:
-            low_bucket.append(pick)
+    med_score = median(w.points for w in pool)
+    temp_pool = pool[:]
+    picked_high_to_low = []
+
+    # 1. Pick based on raw score (Higher score = Picked sooner)
+    while temp_pool:
+        weights = [w.weight for w in temp_pool]
+        pick = random.choices(temp_pool, weights=weights, k=1)[0]
+
+        # Tag the status based on the median
+        if pick.points >= med_score:
+            pick.status = "Above"
         else:
-            high_bucket.append(pick)
-        del watchstanders[idx]
-        del weights[idx]
+            pick.status = "Below"
 
-    return low_bucket, high_bucket, median_score
+        picked_high_to_low.append(pick)
+        temp_pool.remove(pick)
 
-
-def save_csv(file_path: str, selected: list) -> None:
-    """Create new csv file."""
-    fieldnames = selected[0].row.keys()
-    with open(file_path, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(i.row for i in selected)
+    # 2. Flip the list so low-point people are at the top
+    return list(reversed(picked_high_to_low))
 
 
 def main():
-    input_file = 'book1.csv'
-    output_file = 'selected.csv'
+    INPUT_FILE = 'book1.csv'
 
-    watchstanders = read_csv(input_file)
-    low_bucket, high_bucket, med_score = make_selection(watchstanders)
-    selection_list = low_bucket + high_bucket
+    roster = read_watchstanders(INPUT_FILE)
+    if not roster:
+        return
 
-    print(f"---{len(low_bucket)} Below Median---")
-    print('\n'.join(map(str, low_bucket)))
-    print(f"---{len(high_bucket)} Above Median---")
-    print('\n'.join(map(str, high_bucket)))
-    print("---")
-    print(f"Count: {len(selection_list)}")
-    print(f"Median score: {med_score}")
+    # Combined list with status tags
+    final_list = perform_weighted_selection(roster)
 
-    save_csv(output_file, selection_list)
+    # Calculate median just for the display header
+    med = median(w.points for w in roster)
 
-    print(f'Output saved to {output_file}')
+    print(f"\n--- Unified Watchbill (Median: {med}) ---")
+    fmt = "{:<18} | {:>3} | {:<8} | {:<15} | {}"
+    print(fmt.format("Name", "Pts", "Status", "Shift Pref", "Notes"))
+    print("-" * 75)
+
+    for p in final_list:
+        print(fmt.format(p.name, p.points, p.status, p.shift_pref, p.notes))
 
 
 if __name__ == "__main__":
