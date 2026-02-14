@@ -108,10 +108,12 @@
         const file = document.getElementById('csvFile').files[0];
         if (!file) return;
 
+        // split lines and get headers
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter(l => l.trim());
         headers = lines[0].split(',').map(h => h.trim());
 
+        // convert lines into objects
         const rawData = lines.slice(1).map(line => {
             const values = line.split(',').map(v => v.trim());
             const obj = headers.reduce((acc, h, i) => ({...acc, [h]: values[i]}), {});
@@ -123,7 +125,7 @@
             return obj;
         });
 
-        // NEW: Sort by points (low to high) on initial load
+        // sort by points
         masterData = rawData.sort((a, b) => a.Points - b.Points);
 
         document.getElementById('instructions').style.display = 'none';
@@ -131,7 +133,6 @@
         document.getElementById('activeControls').style.display = 'flex';
         document.getElementById('watchTable').style.display = 'table';
 
-        // Initial render without shuffling to preserve the sort order
         render();
     }
 
@@ -145,6 +146,7 @@
     }
 
     function recalculate() {
+        // Weighted random sort
         let pool = [...masterData];
         let pickedOrder = [];
         while (pool.length > 0) {
@@ -164,7 +166,7 @@
 
     function adjustPoints(indexInMaster, delta) {
         masterData[indexInMaster].Points = Math.max(0, masterData[indexInMaster].Points + delta);
-        render(); //
+        render();
     }
 
     function updateNote(indexInMaster, newNote) { masterData[indexInMaster].Notes = newNote; }
@@ -183,13 +185,15 @@
 
         const pts = masterData.map(d => d.Points);
         const sortedPts = [...pts].sort((a, b) => a - b);
+        // find median, min and max
         let median = sortedPts.length % 2 === 0
             ? (sortedPts[sortedPts.length / 2 - 1] + sortedPts[sortedPts.length / 2]) / 2
             : sortedPts[Math.floor(sortedPts.length / 2)];
-
         const minP = Math.min(...pts); const maxP = Math.max(...pts);
+
         let visibleCount = 0;
 
+        // search bar and filters
         masterData.forEach((item, masterIndex) => {
             const nameKey = Object.keys(item).find(k => k.toLowerCase() === 'name');
             if (searchTerm && !item[nameKey].toLowerCase().includes(searchTerm)) return;
@@ -198,16 +202,17 @@
 
             visibleCount++;
             const row = tbody.insertRow();
-            if (item.Points !== item._originalPoints) row.className = "mod-row"; //
+            if (item.Points !== item._originalPoints) row.className = "mod-row";
 
-            let color = '#07f49e'; //
+            // 2-color fade for point cells
+            let color = '#49FDB5';
             if (maxP !== minP) {
                 const ratio = (item.Points - minP) / (maxP - minP);
-                //lime green to dark blue
-                // Start + (End - Start) * ratio
-                const r = Math.floor(77 + (127 - 77) * ratio);
-                const g = Math.floor(244 + (8 - 244) * ratio);
-                const b = Math.floor(158 + (247 - 158) * ratio);
+                //green 49FDB5 to blue 4991FD
+                // start + (end - start) * ratio
+                const r = Math.floor(73 + (73 - 73) * ratio);
+                const g = Math.floor(253 + (145 - 253) * ratio);
+                const b = Math.floor(181 + (253 - 181) * ratio);
                 color = `rgb(${r}, ${g}, ${b})`;
             }
 
@@ -232,7 +237,8 @@
         document.getElementById('statsDisplay').innerText = `Count: ${masterData.length} | Shown: ${visibleCount} | Median: ${median.toFixed(1)}`;
 
         document.getElementById('downloadBtn').onclick = () => {
-            const sanitize = (val) => String(val).replace(/,/g, ''); //
+            // no commas
+            const sanitize = (val) => String(val).replace(/,/g, ';');
             const csvRows = [headers.join(',')];
             masterData.forEach(item => {
                 const row = headers.map(h => sanitize(item[h] || ""));
