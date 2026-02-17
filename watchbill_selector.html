@@ -83,10 +83,9 @@
         <div class="input-row">
             <input type="text" id="searchInput" placeholder="Search by name..." onkeyup="render()">
             <select id="fairnessMode" onchange="render()">
-                <option value="balanced">Balanced (standard fairness)</option>
-                <option value="strict">Strict (points matter most)</option>
-                <option value="random">Varied (mostly random)</option>
-                <option value="none">None (pure luck)</option>
+                <option value="balanced">Mode: Balanced (1.6x Bias)</option>
+                <option value="strict">Mode: Strict (1.8x Bias)</option>
+                <option value="random">Mode: Random (No Bias)</option>
             </select>
         </div>
         <div class="top-bar">
@@ -95,10 +94,10 @@
                 <button class="btn btn-p" onclick="setFilter('above', this)">Above Median</button>
                 <button class="btn btn-p" onclick="setFilter('below', this)">Below/At Median</button>
             </div>
-            <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
                 <div id="statsDisplay" style="font-weight: bold; color: var(--primary); font-size: 0.9rem;"></div>
-                <button class="btn btn-w" onclick="recalculate()">Shuffle & Recalculate</button>
-                <button class="btn btn-s" id="downloadBtn">Download CSV</button>
+                <button class="btn btn-w" onclick="recalculate()">Shuffle</button>
+                <button class="btn btn-s" id="downloadBtn">Download</button>
             </div>
         </div>
     </div>
@@ -122,7 +121,7 @@
         const lines = text.split(/\r?\n/).filter(l => l.trim());
         headers = lines[0].split(',').map(h => h.trim());
 
-        const rawData = lines.slice(1).map(line => {
+        const rawData = lines.slice(1).map((line, idx) => {
             const values = line.split(',').map(v => v.trim());
             const obj = headers.reduce((acc, h, i) => ({...acc, [h]: values[i]}), {});
             const pointKey = Object.keys(obj).find(k => k.toLowerCase() === 'points');
@@ -130,6 +129,7 @@
             obj.Points = parseInt(obj[pointKey]) || 0;
             obj._originalPoints = obj.Points;
             obj.Notes = obj[noteKey] || '';
+            obj.selectionRank = idx + 1;
             return obj;
         });
 
@@ -155,26 +155,30 @@
         let pool = [...masterData];
         let pickedOrder = [];
 
-        if (mode === 'none') {
-            // Completely ignore point weights for shuffling
+        if (mode === 'random') {
+            // no bias was selected, do a standard random shuffle
             while (pool.length > 0) {
                 let idx = Math.floor(Math.random() * pool.length);
-                pickedOrder.push(pool.splice(idx, 1)[0]);
+                let person = pool.splice(idx, 1)[0];
+                person.selectionRank = pickedOrder.length + 1;
+                pickedOrder.push(person);
             }
         } else {
+            // a bias mode was selected, calculate ballast and do weighted selection
             const pts = masterData.map(d => d.Points);
             const minP = Math.min(...pts);
             const maxP = Math.max(...pts);
 
-            let targetT = 1.6; // balanced mode
-            if (mode === 'strict') targetT = 4.0;
-            if (mode === 'random') targetT = 1.1;
+            // bias target
+            let targetT = mode === 'strict' ? 1.8 : 1.6;
 
+            // calculate ballast value (k) to be added to everyone's score temporarily during selection
             let k = (maxP + 1 - targetT * (minP + 1)) / (targetT - 1);
             k = Math.max(-minP, k);
 
+            // weighted selection loop
             while (pool.length > 0) {
-                const weights = pool.map(p => p.Points + 1 + k);
+                const weights = pool.map(p => p.Points + 1 + k); // add points + 1 and ballast to get weight
                 const totalWeight = weights.reduce((a, b) => a + b, 0);
                 let r = Math.random() * totalWeight;
                 let idx = 0;
@@ -182,9 +186,14 @@
                     r -= weights[i];
                     if (r <= 0) { idx = i; break; }
                 }
-                pickedOrder.push(pool.splice(idx, 1)[0]);
+                let person = pool.splice(idx, 1)[0];
+                // Include pick number with the person object
+                person.selectionRank = pickedOrder.length + 1;
+                pickedOrder.push(person);
             }
         }
+
+        // Flip array so that late picks (lower scores) are near the top
         masterData = pickedOrder.reverse();
         render();
     }
@@ -197,38 +206,41 @@
     function updateNote(indexInMaster, newNote) { masterData[indexInMaster].Notes = newNote; }
 
     function render() {
+        // clear body
         const tbody = document.querySelector("#watchTable tbody");
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
         tbody.innerHTML = "";
 
         if (masterData.length === 0) return;
 
+        // check selection mode
         const mode = document.getElementById('fairnessMode').value;
         const pts = masterData.map(d => d.Points);
         const minP = Math.min(...pts);
         const maxP = Math.max(...pts);
 
         let k = 0;
-        let activeBias = "1.0";
-        let isNoneMode = (mode === 'none');
+        let isRandomMode = (mode === 'random');
 
-        if (!isNoneMode) {
-            let targetT = 1.6;
-            if (mode === 'strict') targetT = 4.0;
-            if (mode === 'random') targetT = 1.1;
+        if (!isRandomMode) {
+            // calculate ballast for weight preview in the name column
+            let targetT = mode === 'strict' ? 1.8 : 1.6;
             k = Math.max(-minP, (maxP + 1 - targetT * (minP + 1)) / (targetT - 1));
-            activeBias = ((maxP + 1 + k) / (minP + 1 + k)).toFixed(1);
         }
 
-        const totalWeightPool = isNoneMode ? masterData.length : masterData.reduce((sum, item) => sum + (item.Points + 1 + k), 0);
+        // Global stats
+        const totalWeightPool = isRandomMode ? masterData.length : masterData.reduce((sum, item) => sum + (item.Points + 1 + k), 0);
         const sortedPts = [...pts].sort((a, b) => a - b);
         let median = sortedPts.length % 2 === 0
             ? (sortedPts[sortedPts.length / 2 - 1] + sortedPts[sortedPts.length / 2]) / 2
             : sortedPts[Math.floor(sortedPts.length / 2)];
 
         let visibleCount = 0;
+
         masterData.forEach((item, masterIndex) => {
             const nameKey = Object.keys(item).find(k => k.toLowerCase() === 'name');
+
+            // skip rows that do not match search bar or filter if used
             if (searchTerm && !item[nameKey].toLowerCase().includes(searchTerm)) return;
             if (currentFilter === 'above' && item.Points <= median) return;
             if (currentFilter === 'below' && item.Points > median) return;
@@ -237,22 +249,24 @@
             const row = tbody.insertRow();
             if (item.Points !== item._originalPoints) row.className = "mod-row";
 
-            const weight = isNoneMode ? 1 : (item.Points + 1 + k);
+            const weight = isRandomMode ? 1 : (item.Points + 1 + k);
+            const individualProb = ((weight / totalWeightPool) * 100).toFixed(1);
 
+            // points column 2-color fade: color1 + (color2 - color1) * ratio
             let color = 'rgb(73, 253, 181)';
             if (maxP !== minP) {
                 const ratio = (item.Points - minP) / (maxP - minP);
-                const r = 73;
                 const g = Math.floor(253 + (145 - 253) * ratio);
                 const b = Math.floor(181 + (253 - 181) * ratio);
-                color = `rgb(${r}, ${g}, ${b})`;
+                color = `rgb(73, ${g}, ${b})`;
             }
 
             row.innerHTML = `
-                <td>${masterIndex + 1}</td>
+                <td>${item.selectionRank}</td>
                 <td>
                     <div class="name-flex">
                         <span>${item[nameKey]}</span>
+                        <span class="prob-val">W: ${weight.toFixed(1)} | ${individualProb}%</span>
                     </div>
                 </td>
                 <td class="pt-cell" style="background-color: ${color}">
@@ -270,7 +284,9 @@
             `;
         });
 
-        document.getElementById('statsDisplay').innerText = `Median: ${median.toFixed(1)} | Active Selection Bias: ${activeBias}x`;
+        // update global stats
+        const currentBias = isRandomMode ? "1.0" : ((maxP + 1 + k) / (minP + 1 + k)).toFixed(1);
+        document.getElementById('statsDisplay').innerText = `Showing: ${visibleCount} | Median: ${median.toFixed(1)} | Bias: ${currentBias}x`;
 
         document.getElementById('downloadBtn').onclick = () => {
             const sanitize = (val) => String(val).replace(/,/g, ';');
