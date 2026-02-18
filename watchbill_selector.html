@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Watchbill Selection Assistant - Precision Scaling</title>
+    <title>Watchbill Selection Assistant - Vertical Hint</title>
     <style>
         :root {
             --primary: #63b3ed;
@@ -23,13 +23,16 @@
 
         .controls-active { display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 20px; background: #1a202c; border-radius: 8px; }
 
-        .slider-container { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; background: #2d3748; padding: 10px 20px; border-radius: 6px; border: 1px solid var(--border); transition: 0.3s; }
-        .slider-row { display: flex; align-items: center; gap: 15px; width: 100%; }
+        .slider-container { flex-grow: 1; display: flex; background: #2d3748; padding: 12px 20px; border-radius: 6px; border: 1px solid var(--border); transition: 0.3s; }
+        .slider-row { display: flex; align-items: center; gap: 20px; width: 100%; }
+
+        /* New Information Group for labels */
+        .bias-info { display: flex; flex-direction: column; min-width: 220px; justify-content: center; }
+        .bias-label { font-weight: bold; color: var(--primary); font-size: 0.9rem; white-space: nowrap; transition: color 0.2s; }
+        .sweet-spot-hint { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); transition: 0.3s; margin-top: -2px; text-align: left; }
+
         #biasSlider { flex-grow: 1; cursor: pointer; }
 
-        .bias-label { font-weight: bold; color: var(--primary); min-width: 195px; font-size: 0.9rem; white-space: nowrap; transition: color 0.2s; }
-
-        .sweet-spot-hint { font-size: 0.85rem; font-weight: 600; text-align: center; color: var(--text-muted); transition: 0.3s; margin-top: 2px; }
         .hint-active { color: var(--gold); text-shadow: 0 0 8px rgba(246, 224, 94, 0.3); }
         .container-glow { border-color: var(--gold) !important; box-shadow: 0 0 10px rgba(246, 224, 94, 0.2); }
 
@@ -85,7 +88,7 @@
     <h2>Watchbill Selection Assistant</h2>
 
     <div id="instructions">
-        <p>Load the roster csv file with Name, Points, and Notes headers. Click <b>shuffle</b> to randomize the list.</p>
+        <p>Weighted Selection Logic Active. 1.6x Bias is the <b>Sweet Spot</b> for quarterly rotations.</p>
     </div>
 
     <div class="upload-zone" id="uploadZone">
@@ -98,10 +101,12 @@
             <input type="text" id="searchInput" placeholder="Search by name..." onkeyup="render()">
             <div class="slider-container" id="sliderBox">
                 <div class="slider-row">
-                    <span class="bias-label" id="biasDisplay">Bias: 1.6x (Balanced)</span>
+                    <div class="bias-info">
+                        <span class="bias-label" id="biasDisplay">Bias: 1.6x (Balanced)</span>
+                        <div id="sweetSpotHint" class="sweet-spot-hint">Sweet spot: 1.6x</div>
+                    </div>
                     <input type="range" id="biasSlider" min="1.0" max="10.0" step="0.1" value="1.6" oninput="render()">
                 </div>
-                <div id="sweetSpotHint" class="sweet-spot-hint">Sweet spot: 1.6x</div>
             </div>
         </div>
         <div class="top-bar">
@@ -234,7 +239,6 @@
                 pickedOrder.push(person);
             }
         }
-        // Automatic reversal: high-point holders move to bottom
         masterData = pickedOrder.reverse();
         render();
     }
@@ -257,9 +261,9 @@
         tbody.innerHTML = "";
         if (masterData.length === 0) return;
 
-        // NEW: Refined range labels and cap at 10.0
         let labelText = `Bias: ${targetT.toFixed(1)}x `;
         if (targetT === 1.0) labelText += "(Random)";
+        else if (targetT <= 1.5) labelText += "(Subtle)";
         else if (targetT <= 1.7) labelText += "(Balanced)";
         else if (targetT <= 3.0) labelText += "(Strict)";
         else if (targetT <= 6.5) labelText += "(Intense)";
@@ -268,7 +272,7 @@
         if (targetT === 1.6) {
             hint.classList.add('hint-active');
             box.classList.add('container-glow');
-            biasDisplay.style.color = 'var(--gold)';
+            //biasDisplay.style.color = 'var(--gold)';
         } else {
             hint.classList.remove('hint-active');
             box.classList.remove('container-glow');
@@ -321,23 +325,23 @@
             row.innerHTML = `
                 <td>${item.selectionRank}</td>
                 <td>
-                    <div class="name-flex">
+                    <div class=\"name-flex\">
                         <span>${item[nameKey]}</span>
-                        <span class="prob-val">Odds: ${probPercent}% (W: ${weight.toFixed(1)})</span>
+                        <span class=\"prob-val\">Odds: ${probPercent}% (W: ${weight.toFixed(1)})</span>
                     </div>
                 </td>
-                <td class="pt-cell" style="background-color: ${color}">
-                    <div class="pt-flex">
-                        <div class="pt-val">${item.Points}</div>
-                        <div class="pt-ctrl">
-                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, -1)">-1</button>
-                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 1)">+1</button>
-                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 3)">+3</button>
-                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 4)">+4</button>
+                <td class=\"pt-cell\" style=\"background-color: ${color}\">
+                    <div class=\"pt-flex\">
+                        <div class=\"pt-val\">${item.Points}</div>
+                        <div class=\"pt-ctrl\">
+                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, -1)\">-1</button>
+                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, 1)\">+1</button>
+                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, 3)\">+3</button>
+                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, 4)\">+4</button>
                         </div>
                     </div>
                 </td>
-                <td><input type="text" class="notes-input" value="${item.Notes}" onchange="updateNote(${masterIndex}, this.value)"></td>
+                <td><input type=\"text\" class=\"notes-input\" value=\"${item.Notes}\" onchange=\"updateNote(${masterIndex}, this.value)\"></td>
             `;
         });
 
