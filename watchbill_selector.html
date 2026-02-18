@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Watchbill Selection Assistant</title>
+    <title>Watchbill Selection Assistant - Precision Scaling</title>
     <style>
         :root {
             --primary: #63b3ed;
@@ -13,6 +13,7 @@
             --text-muted: #a0aec0;
             --warning: #f6ad55;
             --border: #4a5568;
+            --gold: #f6e05e;
         }
         body { font-family: -apple-system, system-ui, sans-serif; margin: 40px; background: var(--bg); color: var(--text); line-height: 1.6; }
         .container { max-width: 1200px; margin: auto; background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
@@ -22,16 +23,29 @@
 
         .controls-active { display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 20px; background: #1a202c; border-radius: 8px; }
 
+        .slider-container { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; background: #2d3748; padding: 10px 20px; border-radius: 6px; border: 1px solid var(--border); transition: 0.3s; }
+        .slider-row { display: flex; align-items: center; gap: 15px; width: 100%; }
+        #biasSlider { flex-grow: 1; cursor: pointer; }
+
+        .bias-label { font-weight: bold; color: var(--primary); min-width: 195px; font-size: 0.9rem; white-space: nowrap; transition: color 0.2s; }
+
+        .sweet-spot-hint { font-size: 0.85rem; font-weight: 600; text-align: center; color: var(--text-muted); transition: 0.3s; margin-top: 2px; }
+        .hint-active { color: var(--gold); text-shadow: 0 0 8px rgba(246, 224, 94, 0.3); }
+        .container-glow { border-color: var(--gold) !important; box-shadow: 0 0 10px rgba(246, 224, 94, 0.2); }
+
         .input-row { display: flex; gap: 10px; align-items: center; width: 100%; }
-        #searchInput { flex-grow: 2; padding: 10px; background: #2d3748; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 0.95rem; }
-        #fairnessMode { flex-grow: 1; padding: 10px; background: #2d3748; border: 1px solid var(--border); border-radius: 6px; color: white; cursor: pointer; font-size: 0.95rem; }
+        #searchInput { flex-grow: 1; padding: 10px; background: #2d3748; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 0.95rem; }
 
         .top-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; }
-        #filterControls { display: flex; gap: 8px; }
+        #filterControls { display: flex; gap: 8px; align-items: center; }
+        .item-count { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-left: 10px; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 15px; display: none; table-layout: auto; }
         th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
         th { background: #2d3748; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); }
+
+        .sortable { cursor: pointer; user-select: none; transition: 0.2s; }
+        .sortable:hover { color: var(--primary); background: #334155; }
 
         .name-flex { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         .prob-val { opacity: 0; transition: opacity 0.2s ease-in-out; color: var(--primary); font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
@@ -71,7 +85,7 @@
     <h2>Watchbill Selection Assistant</h2>
 
     <div id="instructions">
-        <p>Choose a <b>Fairness Mode</b> and click <b>Shuffle</b>. Make adjustments to points and notes, then click <b>Download CSV</b> to save your changes.</p>
+        <p>Load the roster csv file with Name, Points, and Notes headers. Click <b>shuffle</b> to randomize the list.</p>
     </div>
 
     <div class="upload-zone" id="uploadZone">
@@ -82,17 +96,20 @@
     <div class="controls-active" id="activeControls">
         <div class="input-row">
             <input type="text" id="searchInput" placeholder="Search by name..." onkeyup="render()">
-            <select id="fairnessMode" onchange="render()">
-                <option value="balanced">Mode: Balanced (1.6x Bias)</option>
-                <option value="strict">Mode: Strict (1.8x Bias)</option>
-                <option value="random">Mode: Random (No Bias)</option>
-            </select>
+            <div class="slider-container" id="sliderBox">
+                <div class="slider-row">
+                    <span class="bias-label" id="biasDisplay">Bias: 1.6x (Balanced)</span>
+                    <input type="range" id="biasSlider" min="1.0" max="10.0" step="0.1" value="1.6" oninput="render()">
+                </div>
+                <div id="sweetSpotHint" class="sweet-spot-hint">Sweet spot: 1.6x</div>
+            </div>
         </div>
         <div class="top-bar">
             <div id="filterControls">
                 <button class="btn btn-s" onclick="setFilter('all', this)">All</button>
                 <button class="btn btn-p" onclick="setFilter('above', this)">Above Median</button>
                 <button class="btn btn-p" onclick="setFilter('below', this)">Below/At Median</button>
+                <span class="item-count" id="itemCount"></span>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <div id="statsDisplay" style="font-weight: bold; color: var(--primary); font-size: 0.9rem;"></div>
@@ -103,7 +120,14 @@
     </div>
 
     <table id="watchTable">
-        <thead><tr><th>Order</th><th>NAME</th><th>Points</th><th>Notes</th></tr></thead>
+        <thead>
+            <tr>
+                <th class="sortable" onclick="sortTable('order')">Order ↕</th>
+                <th class="sortable" onclick="sortTable('name')">NAME ↕</th>
+                <th class="sortable" onclick="sortTable('Points')">Points ↕</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
         <tbody></tbody>
     </table>
 </div>
@@ -112,6 +136,7 @@
     let masterData = [];
     let headers = [];
     let currentFilter = 'all';
+    let sortConfig = { key: null, dir: 1 };
 
     async function handleFileUpload() {
         const file = document.getElementById('csvFile').files[0];
@@ -133,11 +158,37 @@
             return obj;
         });
 
-        masterData = rawData.sort((a, b) => a.Points - b.Points);
+        masterData = rawData;
         document.getElementById('instructions').style.display = 'none';
         document.getElementById('uploadZone').style.display = 'none';
         document.getElementById('activeControls').style.display = 'flex';
         document.getElementById('watchTable').style.display = 'table';
+        render();
+    }
+
+    function sortTable(key) {
+        let targetKey;
+        if (key === 'name') {
+            targetKey = Object.keys(masterData[0]).find(k => k.toLowerCase() === 'name');
+        } else if (key === 'Points') {
+            targetKey = 'Points';
+        } else if (key === 'order') {
+            targetKey = 'selectionRank';
+        }
+
+        if (sortConfig.key === targetKey) {
+            sortConfig.dir *= -1;
+        } else {
+            sortConfig.key = targetKey;
+            sortConfig.dir = 1;
+        }
+
+        masterData.sort((a, b) => {
+            let valA = a[targetKey];
+            let valB = b[targetKey];
+            if (typeof valA === 'string') return valA.localeCompare(valB) * sortConfig.dir;
+            return (valA - valB) * sortConfig.dir;
+        });
         render();
     }
 
@@ -151,12 +202,11 @@
     }
 
     function recalculate() {
-        const mode = document.getElementById('fairnessMode').value;
+        const targetT = parseFloat(document.getElementById('biasSlider').value);
         let pool = [...masterData];
         let pickedOrder = [];
 
-        if (mode === 'random') {
-            // no bias was selected, do a standard random shuffle
+        if (targetT === 1.0) {
             while (pool.length > 0) {
                 let idx = Math.floor(Math.random() * pool.length);
                 let person = pool.splice(idx, 1)[0];
@@ -164,21 +214,14 @@
                 pickedOrder.push(person);
             }
         } else {
-            // a bias mode was selected, calculate ballast and do weighted selection
             const pts = masterData.map(d => d.Points);
             const minP = Math.min(...pts);
             const maxP = Math.max(...pts);
-
-            // bias target
-            let targetT = mode === 'strict' ? 1.8 : 1.6;
-
-            // calculate ballast value (k) to be added to everyone's score temporarily during selection
             let k = (maxP + 1 - targetT * (minP + 1)) / (targetT - 1);
             k = Math.max(-minP, k);
 
-            // weighted selection loop
             while (pool.length > 0) {
-                const weights = pool.map(p => p.Points + 1 + k); // add points + 1 and ballast to get weight
+                const weights = pool.map(p => p.Points + 1 + k);
                 const totalWeight = weights.reduce((a, b) => a + b, 0);
                 let r = Math.random() * totalWeight;
                 let idx = 0;
@@ -187,13 +230,11 @@
                     if (r <= 0) { idx = i; break; }
                 }
                 let person = pool.splice(idx, 1)[0];
-                // Include pick number with the person object
                 person.selectionRank = pickedOrder.length + 1;
                 pickedOrder.push(person);
             }
         }
-
-        // Flip array so that late picks (lower scores) are near the top
+        // Automatic reversal: high-point holders move to bottom
         masterData = pickedOrder.reverse();
         render();
     }
@@ -206,41 +247,57 @@
     function updateNote(indexInMaster, newNote) { masterData[indexInMaster].Notes = newNote; }
 
     function render() {
-        // clear body
         const tbody = document.querySelector("#watchTable tbody");
         const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        tbody.innerHTML = "";
+        const targetT = parseFloat(document.getElementById('biasSlider').value);
+        const biasDisplay = document.getElementById('biasDisplay');
+        const hint = document.getElementById('sweetSpotHint');
+        const box = document.getElementById('sliderBox');
 
+        tbody.innerHTML = "";
         if (masterData.length === 0) return;
 
-        // check selection mode
-        const mode = document.getElementById('fairnessMode').value;
+        // NEW: Refined range labels and cap at 10.0
+        let labelText = `Bias: ${targetT.toFixed(1)}x `;
+        if (targetT === 1.0) labelText += "(Random)";
+        else if (targetT <= 1.7) labelText += "(Balanced)";
+        else if (targetT <= 3.0) labelText += "(Strict)";
+        else if (targetT <= 6.5) labelText += "(Intense)";
+        else labelText += "(Near Absolute)";
+
+        if (targetT === 1.6) {
+            hint.classList.add('hint-active');
+            box.classList.add('container-glow');
+            biasDisplay.style.color = 'var(--gold)';
+        } else {
+            hint.classList.remove('hint-active');
+            box.classList.remove('container-glow');
+            biasDisplay.style.color = 'var(--primary)';
+        }
+        biasDisplay.innerText = labelText;
+
         const pts = masterData.map(d => d.Points);
         const minP = Math.min(...pts);
         const maxP = Math.max(...pts);
 
         let k = 0;
-        let isRandomMode = (mode === 'random');
-
+        let isRandomMode = (targetT === 1.0);
         if (!isRandomMode) {
-            // calculate ballast for weight preview in the name column
-            let targetT = mode === 'strict' ? 1.8 : 1.6;
             k = Math.max(-minP, (maxP + 1 - targetT * (minP + 1)) / (targetT - 1));
         }
 
-        // Global stats
         const totalWeightPool = isRandomMode ? masterData.length : masterData.reduce((sum, item) => sum + (item.Points + 1 + k), 0);
         const sortedPts = [...pts].sort((a, b) => a - b);
         let median = sortedPts.length % 2 === 0
             ? (sortedPts[sortedPts.length / 2 - 1] + sortedPts[sortedPts.length / 2]) / 2
             : sortedPts[Math.floor(sortedPts.length / 2)];
 
-        let visibleCount = 0;
+        const minProb = isRandomMode ? (1 / totalWeightPool) : ((minP + 1 + k) / totalWeightPool);
+        const maxProb = isRandomMode ? (1 / totalWeightPool) : ((maxP + 1 + k) / totalWeightPool);
 
+        let visibleCount = 0;
         masterData.forEach((item, masterIndex) => {
             const nameKey = Object.keys(item).find(k => k.toLowerCase() === 'name');
-
-            // skip rows that do not match search bar or filter if used
             if (searchTerm && !item[nameKey].toLowerCase().includes(searchTerm)) return;
             if (currentFilter === 'above' && item.Points <= median) return;
             if (currentFilter === 'below' && item.Points > median) return;
@@ -250,12 +307,12 @@
             if (item.Points !== item._originalPoints) row.className = "mod-row";
 
             const weight = isRandomMode ? 1 : (item.Points + 1 + k);
-            const individualProb = ((weight / totalWeightPool) * 100).toFixed(1);
+            const odds = weight / totalWeightPool;
+            const probPercent = (odds * 100).toFixed(1);
 
-            // points column 2-color fade: color1 + (color2 - color1) * ratio
             let color = 'rgb(73, 253, 181)';
-            if (maxP !== minP) {
-                const ratio = (item.Points - minP) / (maxP - minP);
+            if (maxProb !== minProb) {
+                const ratio = (odds - minProb) / (maxProb - minProb);
                 const g = Math.floor(253 + (145 - 253) * ratio);
                 const b = Math.floor(181 + (253 - 181) * ratio);
                 color = `rgb(73, ${g}, ${b})`;
@@ -266,7 +323,7 @@
                 <td>
                     <div class="name-flex">
                         <span>${item[nameKey]}</span>
-                        <span class="prob-val">W: ${weight.toFixed(1)} | ${individualProb}%</span>
+                        <span class="prob-val">Odds: ${probPercent}% (W: ${weight.toFixed(1)})</span>
                     </div>
                 </td>
                 <td class="pt-cell" style="background-color: ${color}">
@@ -284,9 +341,8 @@
             `;
         });
 
-        // update global stats
-        const currentBias = isRandomMode ? "1.0" : ((maxP + 1 + k) / (minP + 1 + k)).toFixed(1);
-        document.getElementById('statsDisplay').innerText = `Showing: ${visibleCount} | Median: ${median.toFixed(1)} | Bias: ${currentBias}x`;
+        document.getElementById('itemCount').innerText = `Showing: ${visibleCount}`;
+        document.getElementById('statsDisplay').innerText = `Median: ${median.toFixed(1)}`;
 
         document.getElementById('downloadBtn').onclick = () => {
             const sanitize = (val) => String(val).replace(/,/g, ';');
