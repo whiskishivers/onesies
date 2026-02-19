@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Watchbill Selection Assistant - Vertical Hint</title>
+    <title>Watchbill Selection Assistant</title>
     <style>
         :root {
             --primary: #63b3ed;
@@ -15,71 +15,72 @@
             --border: #4a5568;
             --gold: #f6e05e;
         }
-        body { font-family: -apple-system, system-ui, sans-serif; margin: 40px; background: var(--bg); color: var(--text); line-height: 1.6; }
-        .container { max-width: 1200px; margin: auto; background: var(--card-bg); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        /* Tightened page margins */
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 20px; background: var(--bg); color: var(--text); line-height: 1.4; }
+        .container { max-width: 1250px; margin: auto; background: var(--card-bg); padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
 
-        #instructions { background: #2c5282; border-left: 5px solid var(--primary); padding: 20px; border-radius: 8px; margin-bottom: 30px; color: #ebf8ff; font-size: 0.9rem; }
-        .upload-zone { border: 2px dashed var(--border); padding: 30px; text-align: center; border-radius: 8px; background: #2d3748; transition: 0.3s; }
+        #instructions { background: #2c5282; border-left: 5px solid var(--primary); padding: 15px; border-radius: 8px; margin-bottom: 20px; color: #ebf8ff; font-size: 0.85rem; }
+        .upload-zone { border: 2px dashed var(--border); padding: 20px; text-align: center; border-radius: 8px; background: #2d3748; transition: 0.3s; }
 
-        .controls-active { display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 20px; background: #1a202c; border-radius: 8px; }
+        .controls-active { display: none; flex-direction: column; gap: 12px; margin-bottom: 15px; padding: 15px; background: #1a202c; border-radius: 8px; }
 
-        .slider-container { flex-grow: 1; display: flex; background: #2d3748; padding: 12px 20px; border-radius: 6px; border: 1px solid var(--border); transition: 0.3s; }
+        .slider-container { flex-grow: 1; display: flex; background: #2d3748; padding: 10px 18px; border-radius: 6px; border: 1px solid var(--border); transition: 0.3s; }
         .slider-row { display: flex; align-items: center; gap: 20px; width: 100%; }
 
-        /* New Information Group for labels */
-        .bias-info { display: flex; flex-direction: column; min-width: 220px; justify-content: center; }
-        .bias-label { font-weight: bold; color: var(--primary); font-size: 0.9rem; white-space: nowrap; transition: color 0.2s; }
-        .sweet-spot-hint { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); transition: 0.3s; margin-top: -2px; text-align: left; }
+        .bias-info { display: flex; flex-direction: column; min-width: 210px; justify-content: center; }
+        .bias-label { font-weight: bold; color: var(--primary); font-size: 0.85rem; white-space: nowrap; transition: color 0.2s; }
+        .sweet-spot-hint { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); transition: 0.3s; margin-top: -2px; text-align: left; cursor: pointer; user-select: none; }
 
         #biasSlider { flex-grow: 1; cursor: pointer; }
 
-        .hint-active { color: var(--gold); text-shadow: 0 0 8px rgba(246, 224, 94, 0.3); }
+        .hint-active { color: var(--gold) !important; text-shadow: 0 0 8px rgba(246, 224, 94, 0.3); }
         .container-glow { border-color: var(--gold) !important; box-shadow: 0 0 10px rgba(246, 224, 94, 0.2); }
 
         .input-row { display: flex; gap: 10px; align-items: center; width: 100%; }
-        #searchInput { flex-grow: 1; padding: 10px; background: #2d3748; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 0.95rem; }
+        #searchInput { flex-grow: 1; padding: 8px; background: #2d3748; border: 1px solid var(--border); border-radius: 6px; color: white; font-size: 0.9rem; }
 
-        .top-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; }
-        #filterControls { display: flex; gap: 8px; align-items: center; }
-        .item-count { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-left: 10px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 5px; }
+        #filterControls { display: flex; gap: 6px; align-items: center; }
+        .item-count { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-left: 8px; }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; display: none; table-layout: auto; }
-        th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
-        th { background: #2d3748; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); }
+        /* COMPACT TABLE STYLES */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; display: none; table-layout: auto; font-size: 0.85rem; }
+        th, td { padding: 3px 10px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        th { background: #2d3748; font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); padding-top: 6px; padding-bottom: 6px; }
 
         .sortable { cursor: pointer; user-select: none; transition: 0.2s; }
         .sortable:hover { color: var(--primary); background: #334155; }
 
         .name-flex { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        .prob-val { opacity: 0; transition: opacity 0.2s ease-in-out; color: var(--primary); font-size: 0.8rem; font-weight: bold; white-space: nowrap; }
+        .prob-val { opacity: 0; transition: opacity 0.2s ease-in-out; color: var(--primary); font-size: 0.75rem; white-space: nowrap; }
         td:hover .prob-val { opacity: 1; }
 
         .pt-cell { width: 1%; white-space: nowrap; transition: background 0.2s; }
-        .pt-flex { display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .pt-val { font-weight: bold; color: #1a202c; font-size: 1rem; min-width: 25px; text-align: center; }
+        .pt-flex { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .pt-val { font-weight: bold; color: #1a202c; font-size: 0.9rem; min-width: 22px; text-align: center; }
 
-        .pt-ctrl { display: flex; align-items: center; gap: 3px; opacity: 0; transition: opacity 0.2s ease-in-out; }
+        .pt-ctrl { display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.2s ease-in-out; }
         .pt-cell:hover .pt-ctrl { opacity: 1; }
 
         .btn-adj {
-            width: 26px; height: 22px;
-            border: 1px solid rgba(0,0,0,0.15);
-            background: rgba(255,255,255,0.85);
+            width: 22px; height: 18px;
+            border: 1px solid rgba(0,0,0,0.1);
+            background: rgba(255,255,255,0.9);
             color: #1a202c;
-            border-radius: 4px; cursor: pointer;
-            font-size: 0.7rem; font-weight: bold;
+            border-radius: 3px; cursor: pointer;
+            font-size: 0.6rem; font-weight: bold;
             display: flex; align-items: center; justify-content: center;
         }
         .btn-adj:hover { background: #fff; border-color: var(--primary); }
 
         .mod-row { border-left: 4px solid var(--warning); background: #3c362a !important; }
 
-        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: 0.2s; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.8rem; transition: 0.2s; }
         .btn-p { background: var(--primary); color: #1a202c; }
         .btn-s { background: var(--secondary); color: white; }
         .btn-w { background: var(--warning); color: #1a202c; }
 
-        .notes-input { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: #1a202c; color: white; font-size: 0.9rem; }
+        .notes-input { width: 100%; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: #1a202c; color: white; font-size: 0.8rem; }
     </style>
 </head>
 <body>
@@ -88,7 +89,7 @@
     <h2>Watchbill Selection Assistant</h2>
 
     <div id="instructions">
-        <p>Weighted Selection Logic Active. 1.6x Bias is the <b>Sweet Spot</b> for quarterly rotations.</p>
+        <p>Open roster csv file with Name, Points, and Notes columns. Make adjustments, save with <b>Download</b>.</p>
     </div>
 
     <div class="upload-zone" id="uploadZone">
@@ -103,7 +104,7 @@
                 <div class="slider-row">
                     <div class="bias-info">
                         <span class="bias-label" id="biasDisplay">Bias: 1.6x (Balanced)</span>
-                        <div id="sweetSpotHint" class="sweet-spot-hint">Sweet spot: 1.6x</div>
+                        <div id="sweetSpotHint" class="sweet-spot-hint" onclick="snapToSweetSpot()">Sweet spot: 1.6x</div>
                     </div>
                     <input type="range" id="biasSlider" min="1.0" max="10.0" step="0.1" value="1.6" oninput="render()">
                 </div>
@@ -116,8 +117,8 @@
                 <button class="btn btn-p" onclick="setFilter('below', this)">Below/At Median</button>
                 <span class="item-count" id="itemCount"></span>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <div id="statsDisplay" style="font-weight: bold; color: var(--primary); font-size: 0.9rem;"></div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="statsDisplay" style="font-weight: bold; color: var(--primary); font-size: 0.85rem;"></div>
                 <button class="btn btn-w" onclick="recalculate()">Shuffle</button>
                 <button class="btn btn-s" id="downloadBtn">Download</button>
             </div>
@@ -168,6 +169,12 @@
         document.getElementById('uploadZone').style.display = 'none';
         document.getElementById('activeControls').style.display = 'flex';
         document.getElementById('watchTable').style.display = 'table';
+        render();
+    }
+
+    function snapToSweetSpot() {
+        const slider = document.getElementById('biasSlider');
+        slider.value = 1.6;
         render();
     }
 
@@ -272,7 +279,7 @@
         if (targetT === 1.6) {
             hint.classList.add('hint-active');
             box.classList.add('container-glow');
-            //biasDisplay.style.color = 'var(--gold)';
+            biasDisplay.style.color = 'var(--gold)';
         } else {
             hint.classList.remove('hint-active');
             box.classList.remove('container-glow');
@@ -325,23 +332,23 @@
             row.innerHTML = `
                 <td>${item.selectionRank}</td>
                 <td>
-                    <div class=\"name-flex\">
+                    <div class="name-flex">
                         <span>${item[nameKey]}</span>
-                        <span class=\"prob-val\">Odds: ${probPercent}% (W: ${weight.toFixed(1)})</span>
+                        <span class="prob-val">${probPercent}% | ${weight.toFixed(1)}</span>
                     </div>
                 </td>
-                <td class=\"pt-cell\" style=\"background-color: ${color}\">
-                    <div class=\"pt-flex\">
-                        <div class=\"pt-val\">${item.Points}</div>
-                        <div class=\"pt-ctrl\">
-                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, -1)\">-1</button>
-                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, 1)\">+1</button>
-                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, 3)\">+3</button>
-                            <button class=\"btn-adj\" onclick=\"adjustPoints(${masterIndex}, 4)\">+4</button>
+                <td class="pt-cell" style="background-color: ${color}">
+                    <div class="pt-flex">
+                        <div class="pt-val">${item.Points}</div>
+                        <div class="pt-ctrl">
+                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, -1)">-1</button>
+                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 1)">+1</button>
+                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 3)">+3</button>
+                            <button class="btn-adj" onclick="adjustPoints(${masterIndex}, 4)">+4</button>
                         </div>
                     </div>
                 </td>
-                <td><input type=\"text\" class=\"notes-input\" value=\"${item.Notes}\" onchange=\"updateNote(${masterIndex}, this.value)\"></td>
+                <td><input type="text" class="notes-input" value="${item.Notes}" onchange="updateNote(${masterIndex}, this.value)"></td>
             `;
         });
 
